@@ -54,52 +54,52 @@ React API 的核心理念认为更新就好像造成了整个应用的重新渲�
 
 Reconciliation 是被大家广泛知晓的 "virtual DOM" 背后的算法。更加高层的描述如下：当渲染一个 React 应用，会有一棵节点树生成并保存在内存中。这棵树随后被刷新到渲染环境。举例来说，我们以浏览器环境的应用为例，它会转换为一个 DOM 操作的集合。当应用更新的时候（通常是通过 `setState` 触发），一棵新的树生成。新树将会和先前的树作比较，并计算出更新应用所需要的操作。
 
-尽管 Fiber 是对 Reconciliation 算法从零开始的重写，但是高层的算法[described in the React docs](https://facebook.github.io/react/docs/reconciliation.html) 将是非常相似的。核心点如下：
+尽管 Fiber 是对协调器（译注：这里的协调器可以理解为 Virtual DOM）从零开始的重写，但是高层的算法[described in the React docs](https://facebook.github.io/react/docs/reconciliation.html) 将是非常相似的。核心点如下：
 
 - 不同的组件类型被认为将生成本质上不同的树。React 将不尝试去进行差异比较，而是直接完全替换旧的树。
 - 对于列表的差异比较使用 key 来优化性能。Keys 应当是稳定、可预测且唯一的。
 
 ### Reconciliation versus rendering
 
-The DOM is just one of the rendering environments React can render to, the other major targets being native iOS and Android views via React Native. (This is why "virtual DOM" is a bit of a misnomer.)
+DOM 仅仅是 React 支持的一个渲染环境，通过 React Native 它还可以支持原生 iOS 和 Android 页面的渲染。（这也是为什么 “Virtual DOM” 是一个错误的称呼。）
 
-The reason it can support so many targets is because React is designed so that reconciliation and rendering are separate phases. The reconciler does the work of computing which parts of a tree have changed; the renderer then uses that information to actually update the rendered app.
+React 之所以能够支持如此多的渲染环境，主要是因为它被设计为 reconciliation 和渲染两个过程分离。协调器做了计算两棵树差异的工作；渲染器则会使用计算得到的信息来更新实际的应用。
 
-This separation means that React DOM and React Native can use their own renderers while sharing the same reconciler, provided by React core.
+这样的分离做法意味着 React DOM 和 React Native 可以使用各自的渲染器，并且共享 React 核心库提供的相同的协调器。
 
-Fiber reimplements the reconciler. It is not principally concerned with rendering, though renderers will need to change to support (and take advantage of) the new architecture.
+Fiber 重新实现了协调器。这原则上来说不影响渲染器，虽然渲染器可能将需要改变去支持新的架构，来获得新架构所带来的优势。
 
 ### Scheduling
 
 <dl>
   <dt>scheduling</dt>
-  <dd>the process of determining when work should be performed.</dd>
+  <dd>决定 work 何时应该被执行的过程。</dd>
 
   <dt>work</dt>
-  <dd>any computations that must be performed. Work is usually the result of an update (e.g. <code>setState</code>).
+  <dd>任何计算结果都必须被执行。Work 通常是更新的结果(e.g. <code>setState</code>).
 </dl>
 
-React's [Design Principles](https://facebook.github.io/react/contributing/design-principles.html#scheduling) document is so good on this subject that I'll just quote it here:
+React's [Design Principles](https://facebook.github.io/react/contributing/design-principles.html#scheduling) 文档对这一主题讲得很好，此处我将仅仅引用该文档：
 
-> In its current implementation React walks the tree recursively and calls render functions of the whole updated tree during a single tick. However in the future it might start delaying some updates to avoid dropping frames.
+> 在 React 目前的实现中，React 递归地遍历树并且调用 render 方法在 event loop 的一次迭代中更新整棵树。然而在将来，它将延迟一些更新来防止掉帧。
 >
-> This is a common theme in React design. Some popular libraries implement the "push" approach where computations are performed when the new data is available. React, however, sticks to the "pull" approach where computations can be delayed until necessary.
+> 这是 React 设计中一个公共的主题。一些受欢迎的库实现了“推”的方法，计算会在新数据到来的时候被执行。但是 React 坚持“拉”的方法，计算能够被推迟直到需要的时候。
 >
-> React is not a generic data processing library. It is a library for building user interfaces. We think that it is uniquely positioned in an app to know which computations are relevant right now and which are not.
+> React 不是一个通用的数据处理库。它只是设计来构建用户界面的库。我们认为知晓哪些计算是现在就相关的，哪些不是是在应用程序中有独一无二位置的内容。
 >
-> If something is offscreen, we can delay any logic related to it. If data is arriving faster than the frame rate, we can coalesce and batch updates. We can prioritize work coming from user interactions (such as an animation caused by a button click) over less important background work (such as rendering new content just loaded from the network) to avoid dropping frames.
+> 如果一些东西在屏幕外，我们可以推迟任何与其相关的逻辑。如果数据到来的速度比帧率块，那么我们可以合并并批量更新。我们可以对来自用户与界面互动的工作（如一个按钮点击的动画）和相对不太重要的背后工作（如远程加载数据渲染新的内容）进行优先级的排序来阻止掉帧。
 
-The key points are:
+总结一下核心点如下：
 
-- In a UI, it's not necessary for every update to be applied immediately; in fact, doing so can be wasteful, causing frames to drop and degrading the user experience.
-- Different types of updates have different priorities — an animation update needs to complete more quickly than, say, an update from a data store.
-- A push-based approach requires the app (you, the programmer) to decide how to schedule work. A pull-based approach allows the framework (React) to be smart and make those decisions for you.
+- 在 UI 中，并非所有的更新都需要立即生效。实际上，这样做是浪费的，可能会造成掉帧从而影响用户体验。
+- 不同类型的更新有不同的优先级。一个动画更新通常需要执行得比来自数据的更新更快。
+- 一个以“推”为基础的方案要求应用程序（你，工程师）来决定如何调度工作。而一个以“拉”为核心的方案允许框架（如：React）更智能，来为你做这些决定。
 
-React doesn't currently take advantage of scheduling in a significant way; an update results in the entire subtree being re-rendered immediately. Overhauling React's core algorithm to take advantage of scheduling is the driving idea behind Fiber.
+React 目前没有享受调度带来的优势。一个更新将会导致整个子树被立即重新渲染。 重写 React 的核心算法来享受调度的优势是 Fiber 背后的驱动思想。
 
 ---
 
-Now we're ready to dive into Fiber's implementation. The next section is more technical than what we've discussed so far. Please make sure you're comfortable with the previous material before moving on.
+好了，现在我们准备深度到 Fiber 的实现。下一章会比之前我们的讨论涉及更多技术方面的内容。在继续之前，请确保你很好地理解了前面的材料。
 
 ## What is a fiber?
 
