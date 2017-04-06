@@ -1,8 +1,5 @@
 # React Fiber Architecture ([原文](https://github.com/acdlite/react-fiber-architecture))
 
-> React Conf 2017 上对于 Fiber 的介绍视频，译者补充。
-[Lin Clark - A Cartoon Intro to Fiber - React Conf 2017](https://www.youtube.com/watch?v=ZCuYPiUIONs&t=471s)
-
 ## 简介
 
 React Fiber 是对 React 核心算法的重新实现，目前正在进行中，[进度传送门](http://isfiberreadyyet.com/)。这是 React 团队过去两年研究的成果。
@@ -101,48 +98,49 @@ React 目前没有享受调度带来的优势。一个更新将会导致整个�
 
 好了，现在我们准备深度到 Fiber 的实现。下一章会比之前我们的讨论涉及更多技术方面的内容。在继续之前，请确保你很好地理解了前面的材料。
 
-## What is a fiber?
+## 什么是 fiber？
 
-We're about to discuss the heart of React Fiber's architecture. Fibers are a much lower-level abstraction than application developers typically think about. If you find yourself frustrated in your attempts to understand it, don't feel discouraged. Keep trying and it will eventually make sense. (When you do finally get it, please suggest how to improve this section.)
+我们即将讨论 React Fiber 架构的核心。Fibers 是比应用程序开发者通常认为的要底层得多的抽象。如果你在尝试理解过程中出现了瓶颈，请不要沮丧。保持尝试它将最终说得通。（当你最终理解了，请对改进这个章节给出建议）
 
-Here we go!
+好，让我们开始！
 
 ---
 
-We've established that a primary goal of Fiber is to enable React to take advantage of scheduling. Specifically, we need to be able to
+我们已经说明了 Fiber 的主要目标是让 React 能够享受到调度带来的好处。明确地说，我们需要能够做到以下几件事：
 
-- pause work and come back to it later.
-- assign priority to different types of work.
-- reuse previously completed work.
-- abort work if it's no longer needed.
+- 暂停任务并能够在之后恢复任务。
+- 为不同的任务设置不同的优先级。
+- 重新使用之前完成的任务。
+- 如果不在需要则可以终止一个任务。
 
-In order to do any of this, we first need a way to break work down into units. In one sense, that's what a fiber is. A fiber represents a **unit of work**.
+为了做到这些事，我们首先需要一个方式来拆分这些任务为一个个任务单元。从某种意义上来说，这些任务单元就是 fiber。一个 fiber 代表了一个 **任务单元**.
 
-To go further, let's go back to the conception of [React components as functions of data](https://github.com/reactjs/react-basic#transformation), commonly expressed as
+更进一步得说，我们回到 [React components as functions of data](https://github.com/reactjs/react-basic#transformation) 的概念, 更通俗地表示如下：
 
 ```
 v = f(d)
 ```
 
-It follows that rendering a React app is akin to calling a function whose body contains calls to other functions, and so on. This analogy is useful when thinking about fibers.
+因此渲染 React 应用程序就类似于调用一个包含其他函数调用的函数。这个比喻在思考 fibers 时十分地有用。
 
-The way computers typically track a program's execution is using the [call stack](https://en.wikipedia.org/wiki/Call_stack). When a function is executed, a new **stack frame** is added to the stack. That stack frame represents the work that is performed by that function.
+通常情况下，计算机跟踪程序执行是通过[调用栈](https://en.wikipedia.org/wiki/Call_stack)。当一个函数执行，一个新的 **栈帧** 被添加到调用栈。栈帧代表了函数执行的任务。
 
-When dealing with UIs, the problem is that if too much work is executed all at once, it can cause animations to drop frames and look choppy. What's more, some of that work may be unnecessary if it's superseded by a more recent update. This is where the comparison between UI components and function breaks down, because components have more specific concerns than functions in general.
+在处理 UIs 时，一次性执行过多的任务将会造成动画掉帧，看起来不稳定的问题。
+并且，随着一些更近的更新的到来，一些任务通常是被代替不需要的。这是对 UI 组件和函数的类比被打破的地方，因为组件比起函数通常有更多具体的问题要考虑。
 
-Newer browsers (and React Native) implement APIs that help address this exact problem: `requestIdleCallback` schedules a low priority function to be called during an idle period, and `requestAnimationFrame` schedules a high priority function to be called on the next animation frame. The problem is that, in order to use those APIs, you need a way to break rendering work into incremental units. If you rely only on the call stack, it will keep doing work until the stack is empty.
+现代浏览器（以及 React Native）实现了能够帮助定位这个确切问题的 API：`requestIdleCallback` 可以在浏览器处于闲置状态时调度一个低优先级的函数去执行。而 `requestAnimationFrame` 调度一个高优先级的函数在下一个动画帧被执行。问题在于，为了使用这些 APIs，你需要一种方式将渲染任务拆分成增量的单元。如果你只依赖于调用栈，它将一直工作直到调用栈为空。
 
-Wouldn't it be great if we could customize the behavior of the call stack to optimize for rendering UIs? Wouldn't it be great if we could interrupt the call stack at will and manipulate stack frames manually?
+如果我们可以自定义调用堆栈的行为来优化 UI 渲染，那不是很好吗？如果我们可以随意中断调用栈并手动操作栈帧，那不是很好吗？
 
-That's the purpose of React Fiber. Fiber is reimplementation of the stack, specialized for React components. You can think of a single fiber as a **virtual stack frame**.
+这是 React Fiber 的目标。Fiber is 是专门为 React 组件重新实现的调用栈。你可以认为一个简单的 fiber 是一个 **虚拟栈帧**。
 
-The advantage of reimplementing the stack is that you can [keep stack frames in memory](https://www.facebook.com/groups/2003630259862046/permalink/2054053404819731/) and execute them however (and *whenever*) you want. This is crucial for accomplishing the goals we have for scheduling.
+重新实现调用栈的好处是你可以[把栈帧保存在内存中](https://www.facebook.com/groups/2003630259862046/permalink/2054053404819731/)并且以你想要的方式在你想要的时候执行。这对于实现我们调度中提到的目标是至关重要的。
 
-Aside from scheduling, manually dealing with stack frames unlocks the potential for features such as concurrency and error boundaries. We will cover these topics in future sections.
+除了调度之外，手动处理栈帧还会释放诸如并发和错误边界等功能的潜力。我们将在以后的章节中介绍这些主题。
 
-In the next section, we'll look more at the structure of a fiber.
+在下一章，我们将更多地了解下一个 fiber 的结构。
 
-### Structure of a fiber
+### fiber 的结构
 
 *Note: as we get more specific about implementation details, the likelihood that something may change increases. Please file a PR if you notice any mistakes or outdated information.*
 
@@ -248,7 +246,7 @@ Every fiber eventually has output, but output is created only at the leaf nodes 
 
 The output is what is eventually given to the renderer so that it can flush the changes to the rendering environment. It's the renderer's responsibility to define how the output is created and updated.
 
-## Future sections
+## 将来的章节
 
 That's all there is for now, but this document is nowhere near complete. Future sections will describe the algorithms used throughout the lifecycle of an update. Topics to cover include:
 
@@ -259,5 +257,6 @@ That's all there is for now, but this document is nowhere near complete. Future 
 - how side-effects (such as lifecycle methods) work.
 - what a coroutine is and how it can be used to implement features like context and layout.
 
-## Related Videos
+## 相关视频
 - [What's Next for React (ReactNext 2016)](https://youtu.be/aV1271hd9ew)
+- [Lin Clark - A Cartoon Intro to Fiber - React Conf 2017](https://www.youtube.com/watch?v=ZCuYPiUIONs&t=471s)
