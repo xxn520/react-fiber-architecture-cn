@@ -48,16 +48,16 @@ Fiber 的开发仍在进行中，[进度传送门](http://isfiberreadyyet.com/)�
   <dd>用来渲染 React 应用的数据的改变。通常是 `setState` 的结果。最终将导致一次重新渲染</dd>
 </dl>
 
-The central idea of React's API is to think of updates as if they cause the entire app to re-render. This allows the developer to reason declaratively, rather than worry about how to efficiently transition the app from any particular state to another (A to B, B to C, C to A, and so on).
+React API 的核心理念认为更新就好像造成了整个应用的重新渲染。这允许开发者声明式地推导，而不用担心应用如何从一个状态高效的过渡到另一个状态（A 到 B，B 到 C，C 到 A 等等）。
 
-Actually re-rendering the entire app on each change only works for the most trivial apps; in a real-world app, it's prohibitively costly in terms of performance. React has optimizations which create the appearance of whole app re-rendering while maintaining great performance. The bulk of these optimizations are part of a process called **reconciliation**.
+实际上，对于每个更改重新渲染整个应用程序只适用于最微不足道的应用程序。在实际的应用中，这是对性能十分巨大的耗费。React 对此有大量的优化，来保证很好的性能。这些优化的很大一部分是一个被称为 **reconciliation** 的过程的一部分。 
 
-Reconciliation is the algorithm behind what is popularly understood as the "virtual DOM." A high-level description goes something like this: when you render a React application, a tree of nodes that describes the app is generated and saved in memory. This tree is then flushed to the rendering environment — for example, in the case of a browser application, it's translated to a set of DOM operations. When the app is updated (usually via `setState`), a new tree is generated. The new tree is diffed with the previous tree to compute which operations are needed to update the rendered app.
+Reconciliation 是被大家广泛知晓的 "virtual DOM" 背后的算法。更加高层的描述如下：当渲染一个 React 应用，会有一棵节点树生成并保存在内存中。这棵树随后被刷新到渲染环境。举例来说，我们以浏览器环境的应用为例，它会转换为一个 DOM 操作的集合。当应用更新的时候（通常是通过 `setState` 触发），一棵新的树生成。新树将会和先前的树作比较，并计算出更新应用所需要的操作。
 
-Although Fiber is a ground-up rewrite of the reconciler, the high-level algorithm [described in the React docs](https://facebook.github.io/react/docs/reconciliation.html) will be largely the same. The key points are:
+尽管 Fiber 是对 Reconciliation 算法从零开始的重写，但是高层的算法[described in the React docs](https://facebook.github.io/react/docs/reconciliation.html) 将是非常相似的。核心点如下：
 
-- Different component types are assumed to generate substantially different trees. React will not attempt to diff them, but rather replace the old tree completely.
-- Diffing of lists is performed using keys. Keys should be "stable, predictable, and unique."
+- 不同的组件类型被认为将生成本质上不同的树。React 将不尝试去进行差异比较，而是直接完全替换旧的树。
+- 对于列表的差异比较使用 key 来优化性能。Keys 应当是稳定、可预测且唯一的。
 
 ### Reconciliation versus rendering
 
