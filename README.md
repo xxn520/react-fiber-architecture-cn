@@ -142,29 +142,29 @@ v = f(d)
 
 ### fiber 的结构
 
-*Note: as we get more specific about implementation details, the likelihood that something may change increases. Please file a PR if you notice any mistakes or outdated information.*
+*注意：当我们去了解更具体的实现细节的时候，一些内容发生改变的可能性将会增加。请发起一个 PR，如果你发现了错误或者过时的信息。*
 
-In concrete terms, a fiber is a JavaScript object that contains information about a component, its input, and its output.
+具体来说，一个 fiber 是一个包含了组件及其输入输出的 JavaScript 对象。
 
-A fiber corresponds to a stack frame, but it also corresponds to an instance of a component.
+一个 fiber 对应于一个栈帧，但是它也对应与一个组件的实例。
 
-Here are some of the important fields that belong to a fiber. (This list is not exhaustive.)
+一个 fiber 有以下一些重要的字段。（该列表不是完全详尽的）
 
 #### `type` and `key`
 
-The type and key of a fiber serve the same purpose as they do for React elements. (In fact, when a fiber is created from an element, these two fields are copied over directly.)
+type 和 key 在 fiber 中的用途与其在 React 元素中的用途相同。（实际上，当从一个元素创建一个 fiber，这两个字段是直接拷贝过来的。）
 
-The type of a fiber describes the component that it corresponds to. For composite components, the type is the function or class component itself. For host components (`div`, `span`, etc.), the type is a string.
+fiber 的 type 描述了它对应的组件。对于复合组件，type 是函数或者组件类本身。对于宿主环境的组件（`div`、`span` 等），type 是一个字符串。
 
-Conceptually, the type is the function (as in `v = f(d)`) whose execution is being tracked by the stack frame.
+从概念上来讲，type 是执行过程被栈帧跟踪记录的函数（就好像 `v = f(d)`）。
 
-Along with the type, the key is used during reconciliation to determine whether the fiber can be reused.
+key 则与 type 一起，被用来在协调期间决定是否 fiber 可以被重新使用。
 
 #### `child` and `sibling`
 
-These fields point to other fibers, describing the recursive tree structure of a fiber.
+这些字段指向了其他 fibers，它们描述了 fiber 构成的递归结构的树。
 
-The child fiber corresponds to the value returned by a component's `render` method. So in the following example
+孩子 fiber 对应于组件 `render` 方法返回的值。所以在下面的例子中：
 
 ```js
 function Parent() {
@@ -172,9 +172,9 @@ function Parent() {
 }
 ```
 
-The child fiber of `Parent` corresponds to `Child`.
+`Parent` 的孩子 fiber 对应于 `Child`。
 
-The sibling field accounts for the case where `render` returns multiple children (a new feature in Fiber!):
+sibling 字段是为了解释 `render` 方法返回多个子元素的情况（这是 Fiber 中的一个新特性！）:
 
 ```js
 function Parent() {
@@ -182,27 +182,27 @@ function Parent() {
 }
 ```
 
-The child fibers form a singly-linked list whose head is the first child. So in this example, the child of `Parent` is `Child1` and the sibling of `Child1` is `Child2`.
+孩子 fibers 来自一个单链表中的头部元素。所以在上面的例子中，`Parent` 的孩子是 `Child1`，`Child1` 的兄弟是 `Child2`。
 
-Going back to our function analogy, you can think of a child fiber as a [tail-called function](https://en.wikipedia.org/wiki/Tail_call).
+回到我们的函数类比，你可以认为一个函数 fiber 是一个[尾调用函数](https://en.wikipedia.org/wiki/Tail_call).
 
 #### `return`
 
-The return fiber is the fiber to which the program should return after processing the current one. It is conceptually the same as the return address of a stack frame. It can also be thought of as the parent fiber.
+程序处理完当前 fiber 后应该返回 fiber。返回的 fiber 在概念上等同于返回栈帧的地址。
 
-If a fiber has multiple child fibers, each child fiber's return fiber is the parent. So in our example in the previous section, the return fiber of `Child1` and `Child2` is `Parent`.
+如果 fiber 有不同的子 fibers，每个孩子 fiber 是由它的父亲返回的。所以在我们之前章节的例子中，孩子 fiber `Child1` 和 `Child2` 是由 `Parent` 返回的。
 
 #### `pendingProps` and `memoizedProps`
 
-Conceptually, props are the arguments of a function. A fiber's `pendingProps` are set at the beginning of its execution, and `memoizedProps` are set at the end.
+从概念上讲，props 是函数的参数。`pendingProps` 是 fiber 执行开始时的属性集合，`memoizedProps` 则是 fiber 执行结束时的属性集合。
 
-When the incoming `pendingProps` are equal to `memoizedProps`, it signals that the fiber's previous output can be reused, preventing unnecessary work.
+当新到来的 `pendingProps` 等于 `memoizedProps`，意味着 fiber 之前的输出可以被重复使用，防止不必要的工作。
 
 #### `pendingWorkPriority`
 
-A number indicating the priority of the work represented by the fiber. The [ReactPriorityLevel](https://github.com/facebook/react/blob/master/src/renderers/shared/fiber/ReactPriorityLevel.js) module lists the different priority levels and what they represent.
+一个用来表示 fiber 代表的任务优先级的数字。[ReactPriorityLevel](https://github.com/facebook/react/blob/master/src/renderers/shared/fiber/ReactPriorityLevel.js) 模块列出了不同的优先级以及它们所代表的含义。
 
-With the exception of `NoWork`, which is 0, a larger number indicates a lower priority. For example, you could use the following function to check if a fiber's priority is at least as high as the given level:
+除了优先级为 0 的 `NoWork` 以外，一个更大的数字表示更低的优先级。举例来说，你可以使用下列函数来确保一个 fiber 的优先级与给定的级别一样高：
 
 ```js
 function matchesPriority(fiber, priority) {
@@ -211,51 +211,51 @@ function matchesPriority(fiber, priority) {
 }
 ```
 
-*This function is for illustration only; it's not actually part of the React Fiber codebase.*
+*这个函数知识为了说明；它不是 React Fiber 基础代码的一部分。*
 
-The scheduler uses the priority field to search for the next unit of work to perform. This algorithm will be discussed in a future section.
+调度器使用优先级字段来搜索下一个执行的任务单元。这个算法将在将来的章节被讨论。
 
 #### `alternate`
 
 <dl>
   <dt>flush</dt>
-  <dd>To flush a fiber is to render its output onto the screen.</dd>
+  <dd>flush 一个 fiber 就是把它的输出应用到屏幕上。</dd>
 
   <dt>work-in-progress</dt>
-  <dd>A fiber that has not yet completed; conceptually, a stack frame which has not yet returned.</dd>
+  <dd>一个 fiber 还没有完成；从概念上讲，就是一个栈帧还没有返回。</dd>
 </dl>
 
-At any time, a component instance has at most two fibers that correspond to it: the current, flushed fiber, and the work-in-progress fiber.
+在任何时候，一个组件实例至多对应有两个 fibers。它们是当前已经 flush 到屏幕上的 fiber，另一个是正在任务执行中的 fiber。
 
-The alternate of the current fiber is the work-in-progress, and the alternate of the work-in-progress is the current fiber.
+两个 fiber 相互交替。
 
-A fiber's alternate is created lazily using a function called `cloneFiber`. Rather than always creating a new object, `cloneFiber` will attempt to reuse the fiber's alternate if it exists, minimizing allocations.
+fiber 的交替过程是使用一个叫做 `cloneFiber` 的函数延迟创建的。相比于创建一个新的对象，`cloneFiber` 将尝试去重复利用已存在的 fiber，来最小化分配。
 
-You should think of the `alternate` field as an implementation detail, but it pops up often enough in the codebase that it's valuable to discuss it here.
+你应该把 `alternate` 字段做为一个实现细节，但是它在基础代码中经常出现，在此讨论它是有价值的。
 
 #### `output`
 
 <dl>
   <dt>host component</dt>
-  <dd>The leaf nodes of a React application. They are specific to the rendering environment (e.g., in a browser app, they are `div`, `span`, etc.). In JSX, they are denoted using lowercase tag names.</dd>
+  <dd>React 应用的叶子节点。它们由特定的渲染环境决定（例如在网页应用中，它们是 `div`、`span` 等）。在 JSX 中，它们用小写标签名表示。</dd>
 </dl>
 
-Conceptually, the output of a fiber is the return value of a function.
+概念上说，fiber 输出的是函数的返回值。
 
-Every fiber eventually has output, but output is created only at the leaf nodes by **host components**. The output is then transferred up the tree.
+每一个 fiber 最终都有输出，但是输出只包含 ** host components** 叶子节点。输出的内容随后将被转移到书上。
 
-The output is what is eventually given to the renderer so that it can flush the changes to the rendering environment. It's the renderer's responsibility to define how the output is created and updated.
+输出的内容最终会给到渲染器，以至于改变能够被应用到真正的渲染环境上。输出如何被创建和更新则是渲染器的职责。
 
-## 将来的章节
+## 将来的章节（作者立了flag并没有写啊）
 
-That's all there is for now, but this document is nowhere near complete. Future sections will describe the algorithms used throughout the lifecycle of an update. Topics to cover include:
+以上就是现在所有的内容，但是本文档任何地方都不接近完整。在将来的章节，将会描述一次更新贯穿整个生命周期所使用的算法。话题将被包括如下：
 
-- how the scheduler finds the next unit of work to perform.
-- how priority is tracked and propagated through the fiber tree.
-- how the scheduler knows when to pause and resume work.
-- how work is flushed and marked as complete.
-- how side-effects (such as lifecycle methods) work.
-- what a coroutine is and how it can be used to implement features like context and layout.
+- 调度器如何找到下一个任务单元去执行。
+- 优先级在 fiber 树结构中是如何被跟踪和传播的。
+- 调度器如何知道什么时候去暂停和恢复任务。
+- 任务如何被刷新和标记为完成。
+- 副作用（如生命周期方法）如何工作。
+- 什么是协程以及如何利用它来实现上下文和布局的特性。
 
 ## 相关视频
 - [What's Next for React (ReactNext 2016)](https://youtu.be/aV1271hd9ew)
