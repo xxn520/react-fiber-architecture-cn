@@ -4,63 +4,66 @@
 
 React Fiber 是对 React 核心算法的重新实现，目前正在进行中，[进度传送门](http://isfiberreadyyet.com/)。这是 React 团队过去两年研究的成果。
 
-React Fiber 的目标是增强 React 在动画、布局和手势等各个领域的适应性。它的最重要的特性是 **incremental rendering（增量渲染）**：它能够将渲染工作拆分成多块并将这些任务块分散到多个帧执行。
+React Fiber 的目标是提高其对动画，布局和手势等领域的适用性。它的最重要的特性是 **incremental rendering（增量渲染）**：它能够将渲染 work 拆分成多块并将这些任务块分散到多个帧执行。
 
-其他的核心特性还包括当新的更新到来时暂停、中止或恢复工作的能力；为不同类型的更新设置优先级的能力；以及新的并发原语。
+其他的核心特性还包括当新的更新到来时暂停、中止或恢复 work 的能力；为不同类型的更新设置优先级的能力；以及新的并发原语。
 
 ### 关于这篇文档
 
-Fiber 介绍了一些难以直接通过阅读代码理解的新概念。这篇文档源于我在跟踪 React 项目中对 Fiber 的实现时所收集整理的一些笔记。当它慢慢积累，我意识到它将也是一份对他人有用的资源。
+Fiber 介绍了一些难以直接通过阅读代码理解的新颖的概念。这篇文档源于我在跟踪 React 项目中对 Fiber 的实现时所收集整理的一些笔记。随着它慢慢积累，我意识到它也可能是一份对他人有用的资源。
 
-我将使用尽可能清楚语言来完成这篇文档，并且通过明确定义关键属于来避免行话。
+我会尝试尽可能使用最普通的语言，并通过明确定义的关键术语来避免一些行话。我还会尽可能大量引用一些外部的资源。
 
-请注意我并非来自 React 团队，并不从任何权威的角度来发言。**这不是一篇官方文档**，但是我邀请了 React 团队的成员就本文档的准确性进行了 review。
+请注意我并非来自 React 团队，也不从任何权威的角度来发言。**这不是一篇官方文档**，但是我邀请了 React 团队的成员就本文档的准确性进行了 review。
 
-Fiber 的开发仍在进行中，[进度传送门](http://isfiberreadyyet.com/)。**Fiber 是一个正在开发中的项目，因此在完成前很有可能进行重大的重构。** 我对本文档设计的尝试也同时正在尝试中，十分欢迎改进和意见。
+Fiber 的开发仍在进行中，[进度传送门](http://isfiberreadyyet.com/)。**Fiber 是一个正在开发中的项目，因此在完成前很有可能进行重大的重构。** 我也计划在这里继续记录关于它的设计的一些内容。 非常欢迎对此提出改进和建议。
 
-我的目标是在你阅读了本文以后，你将对 Fiber 有足够的理解，[follow along as it's implemented](https://github.com/facebook/react/commits/master/src/renderers/shared/fiber), 甚至最终能够给 React 做贡献。
+我的目标是在你阅读了本文以后，你将对 Fiber 有足够的理解，[follow along as it's implemented](https://github.com/facebook/react/commits/master/src/renderers/shared/fiber), 甚至最终能够对 React 做出贡献。
 
 ### 阅读前的准备
 
 我强烈建议你在继续阅读前熟悉下列的资源：
 
-- [React Components, Elements, and Instances](https://facebook.github.io/react/blog/2015/12/18/react-components-elements-and-instances.html) - "Component" is often an overloaded term. A firm grasp of these terms is crucial.
-- [Reconciliation](https://facebook.github.io/react/docs/reconciliation.html) - A high-level description of React's reconciliation algorithm.
+- [React Components, Elements, and Instances](https://facebook.github.io/react/blog/2015/12/18/react-components-elements-and-instances.html) - "Component" 是一个经常被重复使用的术语。牢牢掌握这些术语至关重要.
+
+- [Reconciliation](https://facebook.github.io/react/docs/reconciliation.html) - 一个对 React 的 reconciliation 算法的整体描述。
+
 - [React Basic Theoretical Concepts](https://github.com/reactjs/react-basic) - A description of the conceptual model of React without implementation burden. Some of this may not make sense on first reading. That's okay, it will make more sense with time.
-- [React Design Principles](https://facebook.github.io/react/contributing/design-principles.html) - Pay special attention to the section on scheduling. It does a great job of explaining the *why* of React Fiber.
+
+- [React Design Principles](https://facebook.github.io/react/contributing/design-principles.html) - 请特别关注 `Scheduling` 部分。它很好地解释了*为什么*使用 React Fiber。
 
 ## 回顾一些概念
 
 如果你还没有准备好，请查看上一章节。
 
-在我们深入了解新家伙前，让我们复习一些概念。
+在我们深入研究新的内容之前，让我们回顾一下几个概念。
 
 ### 什么是 reconciliation？
 
 <dl>
   <dt>reconciliation</dt>
-  <dd>React 用来比较两棵树的算法，它决定树中的哪一部分需要被改变。</dd>
+  <dd>React 用来比较两棵树的算法，它确定树中的哪些部分需要被更新。</dd>
 
   <dt>update</dt>
-  <dd>用来渲染 React 应用的数据的改变。通常是 `setState` 的结果。最终将导致一次重新渲染</dd>
+  <dd>用来渲染 React 应用的数据的改变。通常是 `setState` 的结果。最终结果将是一次重新渲染</dd>
 </dl>
 
-React API 的核心理念认为更新就好像造成了整个应用的重新渲染。这允许开发者声明式地推导，而不用担心应用如何从一个状态高效的过渡到另一个状态（A 到 B，B 到 C，C 到 A 等等）。
+React 的 API 的核心理念是将更新想象成为对整个应用的重新渲染。这允许开发者声明式地推导，而不用担心应用如何从一个状态高效的过渡到另一个状态（A 到 B，B 到 C，C 到 A 等等）。
 
-实际上，对于每个更改重新渲染整个应用程序只适用于最微不足道的应用程序。在实际的应用中，这是对性能十分巨大的耗费。React 对此有大量的优化，来保证很好的性能。这些优化的很大一部分是一个被称为 **reconciliation** 的过程的一部分。 
+实际上，对于每个更改重新渲染整个应用程序只适用于最简单的应用程序。在实际的应用中，对性能会有非常大的开销。React 对此做了优化，在保证良好的性能的同时对整个应用应用进行重新渲染。这些优化的很大一部分是一个被称为 **reconciliation** 的过程的一部分。
 
-Reconciliation 是被大家广泛知晓的 "virtual DOM" 背后的算法。更加高层的描述如下：当渲染一个 React 应用，会有一棵节点树生成并保存在内存中。这棵树随后被刷新到渲染环境。举例来说，我们以浏览器环境的应用为例，它会转换为一个 DOM 操作的集合。当应用更新的时候（通常是通过 `setState` 触发），一棵新的树生成。新树将会和先前的树作比较，并计算出更新应用所需要的操作。
+Reconciliation 是被大家广泛知晓的 "virtual DOM" 背后的算法。更加高层的描述如下：当渲染一个 React 应用，会生成一棵描述应用结构的节点树，并保存在内存中。这棵树随后被刷新到渲染环境。举例来说，我们的浏览器环境，它会转换为一个 DOM 操作的集合。当应用更新的时候（通常是通过 `setState` 触发），会生成一棵新的树。新树会和先前的树进行对比，并计算出更新应用所需要的操作。
 
-尽管 Fiber 是对协调器（译注：这里的协调器可以理解为 Virtual DOM）从零开始的重写，但是高层的算法[described in the React docs](https://facebook.github.io/react/docs/reconciliation.html) 将是非常相似的。核心点如下：
+尽管 Fiber 是对协调器（译注：这里的协调器可以理解为 Virtual DOM）从零开始的重写，但是高层的算法[在 React 文档中的解释](https://facebook.github.io/react/docs/reconciliation.html) 将是非常相似的。核心点如下：
 
 - 不同的组件类型被认为将生成本质上不同的树。React 将不尝试去进行差异比较，而是直接完全替换旧的树。
 - 对于列表的差异比较使用 key 来优化性能。Keys 应当是稳定、可预测且唯一的。
 
 ### Reconciliation versus rendering
 
-DOM 仅仅是 React 支持的一个渲染环境，通过 React Native 它还可以支持原生 iOS 和 Android 页面的渲染。（这也是为什么 “Virtual DOM” 是一个错误的称呼。）
+DOM 仅仅是 React 支持的一个渲染环境，通过 React Native 它还可以支持原生 iOS 和 Android 页面的渲染。（这也是为什么 “Virtual DOM” 有点用词不当。）
 
-React 之所以能够支持如此多的渲染环境，主要是因为它被设计为 reconciliation 和渲染两个过程分离。协调器做了计算两棵树差异的工作；渲染器则会使用计算得到的信息来更新实际的应用。
+React 之所以能够支持如此多的渲染环境，主要是因为在设计上，reconciliation 和渲染两个过程是分离的。reconciliation 做了计算两棵树差异的工作；渲染器则会使用计算得到的信息来更新实际的应用。
 
 这样的分离做法意味着 React DOM 和 React Native 可以使用各自的渲染器，并且共享 React 核心库提供的相同的协调器。
 
@@ -78,7 +81,7 @@ Fiber 重新实现了协调器。这原则上来说不影响渲染器，虽然�
 
 React's [Design Principles](https://facebook.github.io/react/contributing/design-principles.html#scheduling) 文档对这一主题讲得很好，此处我将仅仅引用该文档：
 
-> 在 React 目前的实现中，React 递归地遍历树并且调用 render 方法在 event loop 的一次迭代中更新整棵树。然而在将来，它将延迟一些更新来防止掉帧。
+> 在 React 目前的实现中，React 递归地遍历树并且调用 render 方法在 event loop 的一次迭代中更新整棵树。不过在将来，它将延迟一些更新来防止掉帧。
 >
 > 这是 React 设计中一个公共的主题。一些受欢迎的库实现了“推”的方法，计算会在新数据到来的时候被执行。但是 React 坚持“拉”的方法，计算能够被推迟直到需要的时候。
 >
@@ -89,10 +92,10 @@ React's [Design Principles](https://facebook.github.io/react/contributing/design
 总结一下核心点如下：
 
 - 在 UI 中，并非所有的更新都需要立即生效。实际上，这样做是浪费的，可能会造成掉帧从而影响用户体验。
-- 不同类型的更新有不同的优先级。一个动画更新通常需要执行得比来自数据的更新更快。
+- 不同类型的更新有不同的优先级。一个动画更新相比于来自数据的更新通常需要更快地被执行。
 - 一个以“推”为基础的方案要求应用程序（你，工程师）来决定如何调度工作。而一个以“拉”为核心的方案允许框架（如：React）更智能，来为你做这些决定。
 
-React 目前没有享受调度带来的优势。一个更新将会导致整个子树被立即重新渲染。 重写 React 的核心算法来享受调度的优势是 Fiber 背后的驱动思想。
+React 目前没有享受调度带来的优势。一个更新将会导致整个子树被立即被重新渲染。 背后驱动 Fiber 重写 React 的核心算法是为了来利用调度的优势。
 
 ---
 
@@ -125,8 +128,8 @@ v = f(d)
 
 通常情况下，计算机跟踪程序执行是通过[调用栈](https://en.wikipedia.org/wiki/Call_stack)。当一个函数执行，一个新的 **栈帧** 被添加到调用栈。栈帧代表了函数执行的任务。
 
-在处理 UIs 时，一次性执行过多的任务将会造成动画掉帧，看起来不稳定的问题。
-并且，随着一些更近的更新的到来，一些任务通常是被代替不需要的。这是对 UI 组件和函数的类比被打破的地方，因为组件比起函数通常有更多具体的问题要考虑。
+在处理 UIs 时，一次性执行过多的任务将会造成动画掉帧，看起来卡顿的问题。
+并且，随着一些更近的更新的到来，一些任务通常是不需要的。这是对 UI 组件和函数的类比不同的地方，因为组件比起函数通常有更多具体的问题要考虑。
 
 现代浏览器（以及 React Native）实现了能够帮助定位这个确切问题的 API：`requestIdleCallback` 可以在浏览器处于闲置状态时调度一个低优先级的函数去执行。而 `requestAnimationFrame` 调度一个高优先级的函数在下一个动画帧被执行。问题在于，为了使用这些 APIs，你需要一种方式将渲染任务拆分成增量的单元。如果你只依赖于调用栈，它将一直工作直到调用栈为空。
 
@@ -134,7 +137,7 @@ v = f(d)
 
 这是 React Fiber 的目标。Fiber is 是专门为 React 组件重新实现的调用栈。你可以认为一个简单的 fiber 是一个 **虚拟栈帧**。
 
-重新实现调用栈的好处是你可以[把栈帧保存在内存中](https://www.facebook.com/groups/2003630259862046/permalink/2054053404819731/)并且以你想要的方式在你想要的时候执行。这对于实现我们调度中提到的目标是至关重要的。
+重新实现调用栈的好处是你可以[把栈帧保存在内存中](https://www.facebook.com/groups/2003630259862046/permalink/2054053404819731/)并且以你想要的方式（在你想要的时候）执行。这对于实现我们调度中提到的目标是至关重要的。
 
 除了调度之外，手动处理栈帧还会释放诸如并发和错误边界等功能的潜力。我们将在以后的章节中介绍这些主题。
 
@@ -196,7 +199,7 @@ function Parent() {
 
 从概念上讲，props 是函数的参数。`pendingProps` 是 fiber 执行开始时的属性集合，`memoizedProps` 则是 fiber 执行结束时的属性集合。
 
-当新到来的 `pendingProps` 等于 `memoizedProps`，意味着 fiber 之前的输出可以被重复使用，防止不必要的工作。
+当新到来的 `pendingProps` 等于 `memoizedProps`，意味着 fiber 之前的输出可以被重复使用，避免不必要的工作。
 
 #### `pendingWorkPriority`
 
@@ -242,7 +245,7 @@ fiber 的交替过程是使用一个叫做 `cloneFiber` 的函数延迟创建的
 
 概念上说，fiber 输出的是函数的返回值。
 
-每一个 fiber 最终都有输出，但是输出只包含 ** host components** 叶子节点。输出的内容随后将被转移到书上。
+每一个 fiber 最终都有输出，但是输出只包含 **host components** 叶子节点。输出的内容随后将被转移到树上。
 
 输出的内容最终会给到渲染器，以至于改变能够被应用到真正的渲染环境上。输出如何被创建和更新则是渲染器的职责。
 
